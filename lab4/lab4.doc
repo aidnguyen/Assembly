@@ -1,0 +1,469 @@
+=TEX
+\documentclass{article}
+\usepackage[screen]{geometry}
+\usepackage{ProofPower,graphicx,multicol}
+\setlength{\columnsep}{1cm}
+\usepackage[metapost,truebbox]{mfpic}
+\opengraphsfile{lab4}
+\begin{document}
+\section{Algorithm}
+\begin{multicols}{2}
+\begin{mfpic}[72]{-1}{2}{-2}{3}
+\tlabeljustify{cc}
+\tlpathsep{3pt}
+\gfill[yellow]\tlabeloval(0,2.5){decimal-binary conversion}
+\tlabelrect(0,2){divide by 2}
+\arrow\polyline{(0,1.9), (0,1.1)}
+\polygon{(-0.6,0),(0,0.5),(0.6,0),(0,-0.5)}
+\tlabelrect(0,1){record quotient and remainder}
+\arrow\polyline{(0,0.9), (0,0.5)}
+\tlabel(0,0){is quotient zero?}
+\tlabel(0.1,-0.6){Yes}
+\arrow\polyline{(0.6,0),(1.3,0),(1.3,2),(0.4,2)}
+\tlabel(0.7,0.1){No}
+\arrow\polyline{(0,-0.5), (0,-0.9)}
+\tlabelrect(0,-1){collect remainders right-to-left}
+\end{mfpic}
+\columnbreak
+\\
+\textbf{Examples}
+\\
+\begin{tabular}{ccc}
+Division & Quotient & Remainder \\
+95/2 & 47 & 1 \\
+47/2 & 23 & 1 \\
+23/2 & 11 & 1 \\
+11/2 & 5 & 1 \\
+5/2 & 2 & 1 \\
+2/2 & 1 & 0 \\
+1/2 & 0 & 1 \\
+\end{tabular}
+\\ \\ \\Collect remainders from bottom to top
+\\$\Rightarrow$ \( 95_{d} = 1011111_{b}\)
+\\ \\ \\ \\
+\begin{tabular}{ccc}
+Division & Quotient & Remainder \\
+10/2 & 5 & 0 \\
+5/2 & 2 & 1 \\
+2/2 & 1 & 0 \\
+1/2 & 0 & 1 \\
+\end{tabular}
+\\ \\ \\Collect remainders from bottom to top
+\\$\Rightarrow$ \( 10_{d} = 1010_{b}\)
+\end{multicols}
+\clearpage
+\section{SML}
+Implementing this algorithm in SML. If n is zero, return an empty list of digits, otherwise divide by 2 and append the remainder to the list
+=SML
+PolyML.print_depth 100;
+(* fun dec_to_bin 0 = []
+    |dec_to_bin n = dec_to_bin(n div 2) @ [n mod 2]; *)
+fun cons (x,lst) = (op ::)(x,lst);
+(* fun dec_to_bin 0 = []
+   |dec_to_bin n = dec_to_bin(op div)(n,2) @ cons(op mod)(n,2), []); *)
+fun append (lst1, lst2) = (op @)(lst1, lst2);
+fun dec_to_bin 0 = []
+   |dec_to_bin n = 
+      append(dec_to_bin( (op div)(n,2) ), cons((op mod)(n,2), []));
+fun lst_to_str (0::xs) = "0" ^ lst_to_str xs
+   |lst_to_str (1::xs) = "1" ^ lst_to_str xs
+   |lst_to_str _ = "";
+lst_to_str(dec_to_bin 95); (* expect "1011111" *)
+dec_to_bin 10;
+dec_to_bin 4096;
+lst_to_str(dec_to_bin 5000000000); 
+=TEX
+\pagebreak
+\includegraphics[scale=0.8]{lab4sml.png}
+\clearpage\section{C implementation}
+To implement this in C, we need to create a structure to represent each digit and a pointer to the next structure node. Every time we need to add another digit, we allocate memory for a new node and fill with the value and set the pointer at end of current list to point to this node.
+=C lab4.c
+#include <stdio.h>
+#include <stdlib.h>
+typedef struct list_struct
+{
+  int list_head;
+  struct list_struct * list_tail;
+} * int_list;
+
+int_list cons(int, int_list);
+int_list cons2(int, int_list);
+void print_list(int_list);
+int_list append(int_list, int_list);
+int_list append2(int_list, int_list);
+int_list dec_to_bin(int n);
+int_list dec_to_bin2(int n);
+int_list EAX;
+=TEX
+\pagebreak
+The main function is used to test the algorithm by using a few values such as 95, 10, and 4096.
+=MOREC lab4.c
+int main()
+{
+ /*
+  int_list intLst1 = cons(4,cons(3,cons(2,cons(1,NULL))));
+  int_list intLst2 = cons(8,cons(6,cons(7,cons(5,NULL))));
+  print_list(append(intLst1,intLst2)); 
+
+  append2(intLst1, intLst2);
+  print_list(EAX);
+  print_list(dec_to_bin(95));
+  */
+  dec_to_bin2(95); //assumes EAX global variable has result
+  print_list(EAX);
+
+  dec_to_bin2(10); //assumes EAX global variable has result
+  print_list(EAX);
+
+  dec_to_bin2(4096); //assumes EAX global variable has result
+  print_list(EAX);
+}
+
+=TEX
+\pagebreak
+Convert decimal to binary using append and cons.
+=MOREC lab4.c
+int_list dec_to_bin(int n)
+{
+  if(n ==0) return NULL;//empty list
+  else return append(dec_to_bin(n/2), cons(n%2,NULL));
+}
+=TEX
+This version of dec\_to\_bin does not use function composition so it will be a better model for our conversion to asm code.
+=MOREC lab4.c
+int_list dec_to_bin2(int n){
+  int_list EBX;
+  int quotient, remainder;
+  if(n ==0) EAX = NULL;//empty list
+  else 
+  { //quotient = n/2; //or shift right one bit
+    quotient = n >> 1;
+    dec_to_bin2(quotient);
+    EBX = EAX;
+    remainder = n%2; // or shift right and check carry flag
+    cons2(remainder, NULL); //returns result in EAX
+    append2(EBX, EAX);     //returns result in EAX
+  }
+}
+=TEX
+\pagebreak
+Building up a list requires dynamic memory allocation. Let's not worry about freeing that memory (yet). We can create the memory using malloc and put that new element in an existing list.
+=MOREC lab4.c
+int_list cons(int i, int_list p)
+{
+  int_list lst = malloc( sizeof(struct list_struct));
+  lst->list_head = i;
+  lst->list_tail = p;
+  return lst;
+}
+=TEX
+Here is a version of cons that does not return a value, but puts result in EAX
+=MOREC lab4.c
+int_list cons2(int i, int_list p)
+{
+  int_list lst = malloc (sizeof(struct list_struct));
+  lst->list_head = i;
+  lst->list_tail = p;
+  EAX = lst;
+}
+=TEX
+\pagebreak
+To print out a linked list we must loop through all elements until we detect the last one (that is NULL). We can't use a "for" loop since we don't know how many are in the list.
+=MOREC lab4.c
+void print_list(int_list lst)
+{
+  if(lst != NULL)
+  {
+    printf("%i",lst->list_head);
+    print_list(lst->list_tail);
+  }
+  else
+    printf("\n");
+}
+=TEX
+To append one list to another, use cons and recursively append each element of first list to tail of second list.
+=MOREC lab4.c
+int_list append(int_list lst1, int_list lst2)
+{
+  if (lst1 != NULL) 
+  {
+     return cons(lst1->list_head,append(lst1->list_tail, lst2));
+  }
+  else
+    return lst2;
+}
+=TEX
+\pagebreak
+Here is a version of append tht is more like asm code. i.e. return is to global (register) variable, and there is no function composition, so we need to call append recursively before calling cons.
+=MOREC lab4.c
+int_list append2(int_list lst1, int_list lst2)
+{
+  if (lst1 != NULL)
+  {
+    append2(lst1->list_tail, lst2);
+    EAX = cons(lst1->list_head,EAX);
+  }
+  else 
+    EAX = lst2;
+}
+=TEX
+\includegraphics[scale=0.8]{lab4c.png}
+\clearpage\section{ASM implementation}
+=ASM lab4.s
+.data 
+  .equ NODESIZE,8
+  .lcomm int_list,NODESIZE
+=TEX
+\subsection{main function}
+This is main function where program start, it will push 2, 95, 10, 4096 to pass parameter to and call function dec\_to\_bin. We also need call printf to print out the results. 
+=MOREASM lab4.s
+.text
+.globl _start
+_start:
+=TEX
+\begin{multicols}{2}
+Convert 2 decimal to binary
+=MOREASM lab4.s
+  push $2
+  call dec_to_bin		
+#expect result in EAX
+  add $4, %esp
+  push %eax
+  call print_list
+  add $4, %esp
+=TEX
+\columnbreak
+Convert 95 decimal to binary
+=MOREASM lab4.s
+  push $95
+  call dec_to_bin		
+  add $4, %esp
+  push %eax
+  call print_list
+  add $4, %esp
+=TEX
+\end{multicols}
+\pagebreak
+\begin{multicols}{2}
+Convert 10 decimal to binary
+=MOREASM lab4.s
+push $10
+  call dec_to_bin		
+  add $4, %esp
+  push %eax
+  call print_list
+  add $4, %esp
+=TEX
+\columnbreak
+Convert 4096 decimal to binary
+=MOREASM lab4.s
+push $4096
+  call dec_to_bin		
+  add $4, %esp
+  push %eax
+  call print_list
+  add $4, %esp
+  mov $1, %eax
+  mov $0, %ebx
+  int $0x80
+=TEX
+\end{multicols}
+\includegraphics{lab4asm.png} \\
+\clearpage\subsection{cons function}
+\begin{multicols}{2}
+Here is the cons function translated from function con2 of C code. Since we need to use the register EBX for easy copy data, we use push and pop EBX in function to save old value stored in EBX.
+=MOREASM lab4.s
+cons:
+  push %ebp
+  mov %esp, %ebp
+  push $8		
+  call malloc
+  add $4, %esp  	# expect address in eax
+=TEX
+call malloc function from C library to create 8-bytes size block and return eax point to address of that block. I think we can choose whatever value for size of malloc, as long as eax points to new location generated by malloc function. We choose 8 because it represents that each node have 2 parts: head and tail.
+\columnbreak
+=MOREASM lab4.s
+  push %ebx
+  mov 12(%ebp), %ebx 	#i
+  mov %ebx, (%eax) 	#head
+=TEX
+indirect addressing mode, which means copy the value (i) from EBX to the location in memory where EAX point to
+=MOREASM lab4.s
+  mov 8(%ebp), %ebx 	#p
+  mov %ebx, 4(%eax) 	#tail
+  pop %ebx
+  mov %ebp, %esp
+  pop %ebp
+  ret
+=TEX
+\end{multicols}
+\pagebreak
+\subsection{append function}
+To append to 2 list together. The first node of new list is the first node of list 1 and end node of new list is the end node of list 2.
+\begin{multicols}{2}
+=MOREASM lab4.s
+append:
+ push %ebp
+ mov %esp, %ebp
+ push %ebx
+ mov 12(%ebp), %ebx 	# ebx = address of lst1
+ cmp $0, %ebx	 	# lst1 == NULL
+ jne if_append
+=TEX 
+If lst1 (first parameter) is equal to NULL, 
+=MOREASM lab4.s
+ mov 8(%ebp), %ebx
+ mov %ebx, %eax
+ jmp end_append
+=TEX
+If lst1 (first parameter) is not equal to NULL, call append function again with first parameter is the address that is 4 bytes adding to the address of lst1, and second parameter still the same (lst2).
+\columnbreak
+=MOREASM lab4.s
+if_append:
+ push 4(%ebx)		# lst1->tail
+ push 8(%ebp) 		# lst2
+ call append
+ add $8, %esp
+=TEX
+After call append, call cons to connect new list to where EAX point to, with first parameter is lst1 $\rightarrow$ head and second parameter is EAX, or actually the location where EAX points to.
+=MOREASM lab4.s
+ push (%ebx)
+ push %eax
+ call cons	
+ add $8, %esp
+end_append:
+ pop %ebx
+ mov %ebp, %esp
+ pop %ebp
+ ret
+=TEX
+\end{multicols}
+\pagebreak
+\subsection{dec\_to\_bin function}
+dec\_to\_bin function implementation. Since we need 2 local variable, quotient and remainder, we will sub 8 from ESP to create rooms for them.
+=MOREASM lab4.s
+dec_to_bin: 
+  push %ebp
+  mov %esp, %ebp
+  sub $8,%esp 		# room for 2 local variables
+  
+  cmp $0, 8(%ebp) 	# n == 0
+  jne else_part
+=TEX
+If n equals 0, set EAX equal to 0, which mean NULL (or empty list)
+=MOREASM lab4.s
+  mov $0, %eax		# empty list
+  jmp end_func
+=TEX
+If n is not equal to 0,we copy value n to EAX, then copy value in EAX to first local variable, which is for quotient. The reason we cannot copy value n directly to first local variable is because mov command can't take too many memory references. Then, shift right 1 bit the value stored in first local variable (quotient), which is the same as dividing it by 2. Then push quotient to stack for calling dec\_to\_bin.
+=MOREASM lab4.s
+else_part:
+  mov 8(%ebp),%eax
+  mov %eax,-4(%ebp) 	# copying n to quotient
+  shrl -4(%ebp) 	# divide quotient by 2
+  push -4(%ebp)
+  call dec_to_bin
+  add $4, %esp
+  push %ebx
+  mov %eax, %ebx	# EBX = EAX
+=TEX
+Push and pop EBX to save old EBX value after we done calling function.
+The second local variable is remainder from dividing n by 2. We can shift right 1 bit and check carry flag (CF). Since we already do shr before, it is not right to do shr again to check CF. Hence, we have to replace local varibale quotient by the number before we did shr, and do shr again to check CF. Use command jnc to check whether CF is 0 or not. If CF = 0, then remainder = n%2 ==0, otherwise, remainder = 1
+=MOREASM lab4.s
+  movl $0, -8(%ebp)		# remainder =0
+  mov 8(%ebp),%ecx
+  mov %ecx,-4(%ebp) 		# copying n to quotient
+  shrl -4(%ebp) 		# divide quotient by 2
+  jnc call_cons
+  movl $1, -8(%ebp) 		# remainder = 1
+=TEX
+\pagebreak
+Calling cons function with the first parameter is the remainder, second paramter is NULL
+=MOREASM lab4.s
+call_cons:
+  push -8(%ebp) 		# remainder
+  push $0  			# NULL
+  call cons			# expect result in EAX
+  add $8, %esp
+=TEX
+call append with 2 parameter EBX and EAX to connect nodes.
+=MOREASM lab4.s
+  push %ebx
+  push %eax
+  call append
+  add $8, %esp			# expect result in EAX
+end_func:
+  pop %ebx
+  mov %ebp, %esp
+  pop %ebp
+  ret
+
+=TEX
+\pagebreak
+\subsection{Print\_list function}
+\begin{multicols}{2}
+Here is the implementation for print\_list function. fmt string is needed for printing out head value of each node, and fmt2 string for ending print\_list function calling.
+=MOREASM lab4.s
+.data 
+  fmt: .string "%i"
+  fmt2: .string "\n"
+.text
+print_list:
+  push %ebp
+  mov %esp, %ebp
+  push %ebx
+  mov 8(%ebp), %ebx 		# parameter
+  cmp $0, %ebx
+  je else_print
+=TEX
+If the list is NULL, print nothing; or else, print out first node's head of the list. 
+\\ \textit{push (\%ebx)} means we want to push the value store at location where EBX points to, not the value stored in EBX itself (remember that the value stored in EBX is the address of the first node of the list where EAX points to).
+=MOREASM lab4.s
+  push (%ebx)
+  push $fmt
+  call printf
+  add $8, %esp
+=TEX
+
+Then calling function print\_list again with the parameter is the address of the head of second node ( or tail of first node).
+=MOREASM lab4.s
+  push 4(%ebx)
+  call print_list
+  add $4, %esp
+  jmp end_print
+# print out "\n" if reach the end of the list
+else_print:
+  push $fmt2
+  call printf
+  add $4, %esp
+end_print:
+  pop %ebx
+  mov %ebp, %esp
+  pop %ebp
+  ret
+=TEX
+\end{multicols}
+\clearpage\section{Stack Frame}
+\includegraphics[scale=0.5]{stack1.png}
+\includegraphics[scale=0.5]{stack2.png}\\ \\ 
+\includegraphics[scale=0.5]{stack3.png}
+\includegraphics[scale=0.5]{stack4.png}\\
+\includegraphics[scale=0.5]{stack5.png}
+\includegraphics[scale=0.5]{stack6.png}\\ \\ 
+\begin{center}
+\includegraphics[scale=0.5]{stack7.png} \\
+\includegraphics[scale=0.5]{stack8.png} \\
+\includegraphics[scale=0.5]{stack9.png} \\
+\includegraphics[scale=0.5]{stack10.png}\\
+\includegraphics[scale=0.5]{stack11.png} \\
+\includegraphics[scale=0.5]{stack12.png}\\
+\includegraphics[scale=0.5]{stack13.png} \\
+\includegraphics[scale=0.5]{stack14.png}\\
+\includegraphics[scale=0.5]{stack15.png} \\
+\includegraphics[scale=0.5]{stack16.png}\\
+\includegraphics[scale=0.5]{stack17.png} \\
+\includegraphics[scale=0.5]{stack18.png} \\
+\includegraphics[scale=0.5]{stack19.png} \\
+\includegraphics[scale=0.5]{stack20.png}
+\end{center}
+\end{document}

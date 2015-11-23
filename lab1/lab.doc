@@ -1,0 +1,89 @@
+=TEX
+\documentclass{article}
+\usepackage[screen]{geometry}
+\usepackage{ProofPower, graphicx}
+\begin{document}
+cs118
+=SML
+open TextIO;
+output(stdOut,"Hello from sml\n");
+val x1 = 17;
+val x2 = 3;
+val x3 =1;
+val x4 = 1000;
+x1 + x2 + x3 + x4;
+=TEX
+In a functional language we evaluate expression rather than change the store. Our expected result from adding those 4 values is 1021: \\
+\includegraphics{fig_sml.png}
+\clearpage
+
+The following code is a simple C program to display hello
+=C lab.c
+#include <stdio.h>
+int main()
+{
+  printf("Hello\n");
+  int x1 =17;
+  int x2 = 3;
+  int x3 = 1;
+  int x4 = 1000;
+  x1 += x2;
+  x1 += x3;
+  x1 += x4;
+  printf("The value of x1 is %d\n",x1);
+  return 0;
+}
+=TEX
+\includegraphics{model1.pdf}  \\
+\includegraphics{model2.pdf}  \\
+\includegraphics{model3.pdf}  \\
+\includegraphics{model4.pdf}  \\
+\clearpage
+The following code is a simple ASM program to display Hello
+This command is used to create the executable linking to the dynamic system libraries: \\
+\verb|as -gstabs -o lab.o lab.s|
+\verb|ld -dynamic-linker /lib/ld-linux.so.2 -o labasm lab.o -lc|la
+=ASM lab.s
+.data #Where to list any memory storage you will need for data
+fmt: .string "Hello from asm\n"
+fmt2: .string "x1 = %d\n"
+.text #where the program instructions live
+.globl _start    #where program starts, same as main function in C
+_start:          #define the value of _start label
+=TEX
+Display message about program
+=MOREASM lab.s
+push $fmt
+call printf
+add $4,%esp
+=TEX
+Initialize registers to some values
+=MOREASM lab.s
+mov $17,%eax    #eax = 17
+mov $3,%ebx     #ebx = 3
+mov $1,%ecx     #ecx = 1
+mov $1000,%edx  #edx = 1000
+=TEX
+Accumulate the values into the eax register
+=MOREASM lab.s
+add %ebx,%eax
+add %ecx,%eax
+add %edx,%eax
+=TEX
+Display the result
+=MOREASM lab.s
+push %eax
+push $fmt2
+call printf
+add $8,%esp
+=TEX
+Exit program by calling Linux OS command exit
+=MOREASM lab.s
+mov $1,%eax    #1 is the number of exit system call
+               #which require status code placed in %ebx
+mov $0,%ebx    #0 is returned to the system
+int $0x80      #Interrupt program flow, transfer control to Linux
+	       #so it will do a system call
+=TEX
+\includegraphics{labasm.png}
+\end{document}
