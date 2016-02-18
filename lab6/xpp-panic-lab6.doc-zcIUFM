@@ -1,0 +1,359 @@
+=TEX
+\documentclass{article}
+\usepackage[screen]{geometry}
+\usepackage{ProofPower, graphicx,amsmath,multicol}
+\setlength{\columnsep}{2cm}
+\begin{document}
+\title{Lab 5}
+\author{Ai Nguyen}
+\maketitle
+Lab to explore RAID storage. Using this technique, it is possible to recover from a failed disk drive by stripping data across 3 drives and storing the xor of those 3 values into the 4th (parity) drive \\
+\section{C algorithm}
+=C lab6.c
+#include <stdio.h>
+#include <math.h>
+#define N 48 //Symbolic constant vs Creates memory location
+char dataIn[] = "This is some test data for a RAID simulator";
+char dataOut[N]; //Partial initialization of array
+char disk1[N/3]; // expect to store "Tsso sdaoaA mar"
+char disk2[N/3];
+char disk3[N/3];
+char disk4[N/3];
+int main()
+{
+  printf("dataIn<%s>\n", dataIn);
+=TEX
+\begin{multicols}{2}
+Stripe the data across the drives and store parity in disk4
+=MOREC lab6.c
+  int i =0, j =0;
+  for(i =0, j =0; i < N-2; i+=3, j++)
+  {	disk1[j] = dataIn[i];
+	disk2[j] = dataIn[i+1];
+	disk3[j] = dataIn[i+2];
+	disk4[j] = disk1[j] ^ disk2[j] ^ disk3[j];
+  }
+=TEX
+\columnbreak
+=MOREC lab6.c
+  printf("dataOut<%s>\n", dataOut);
+  printf("disk1<%s>\n", disk1);
+  printf("disk2<%s>\n", disk2);
+  printf("disk3<%s>\n", disk3);
+  printf("disk4<%s>\n", disk4);
+=TEX
+\end{multicols}
+\clearpage
+Suppose disk2 is corrupted(like politicians)
+\begin{multicols}{2}
+=MOREC lab6.c
+for (i=0; i < N/3; i++)
+{
+  disk2[i] = '.';
+}
+for (i=0 , j =0; i < N - 2; i+=3, j++)
+{
+  dataOut[i] = disk1[j];
+  dataOut[i+1] = disk2[j];
+  dataOut[i+2] = disk3[j];
+}
+printf("dataOut<%s>\n", dataOut);
+=TEX
+Fix/rebuild disk2
+=MOREC lab6.c
+for (i =0; i < N/3; i++)
+{
+  disk2[i] = disk1[i] ^ disk3[i] ^ disk4[i];
+}
+=TEX
+\columnbreak
+unstripe data across drives and store msg in dataOut
+=MOREC lab6.c
+for(i =0, j=0; j < N/3; i+=3, j++)
+{
+  dataOut[i] = disk1[j];
+  dataOut[i+1] = disk2[j];
+  dataOut[i+2] = disk3[j];
+}
+printf("dataOut<%s>\n",dataOut);
+  return 0;
+}
+=TEX
+\includegraphics[scale=.5]{lab6c.png}
+\end{multicols}
+\clearpage\section{ASM Code}
+First we create some constants for the size of our (size of string). Use $.equ$ to assign names to numbers.
+\begin{description}
+\item[N]  size of $dataIn$ and $dataOut$ without counting terminated character.
+\item[M]  size of $msg$
+\item[M1]  size of $msg1$
+\item[M2]  size of $msg2$
+\item[DISK\_SIZE] size for disks
+\end{description}
+=ASM lab6.s
+.equ N,53	 
+.equ M,20
+.equ M1,29
+.equ M2,37
+.equ DISK_SIZE, 23
+=TEX
+Data section will include:
+\begin{description}
+\item[dataIn]  Storing test data for our program
+\item[dataOut]  Storing the result from our program. Since we need $dataOut$ the same with $dataIn$, I initialized it the same with $dataIn$ to have the same size.
+\item[disk1,disk2,disk3,disk4] Array for each disk. I initialized each array with their names first and all spaces following ($number of char = DISK\_SIZE$)
+\item[msg,msg1,msg2, endline] These string variables is just for making the output more readable and clearer  
+\end{description}
+\clearpage
+=MOREASM lab6.s
+.data
+  dataIn: .string "DataIn: This is some test data for a RAID simulator  "
+  dataOut: .string "DataOut: This is some test data for a RAID simulator  "
+  disk1: .string "Disk1:                 "
+  disk2: .string "Disk2:                 "
+  disk3: .string "Disk3:                 "
+  disk4: .string "Disk4:                 "
+  msg: .string "ASM RAID simulator\n"
+  msg1: .string "After one disk is corrupted\n"
+  msg2: .string "After rebuilding the corrupted disk\n"
+  endline: .string "\n"
+=TEX
+We won't use $printf$ from C library to print what we need but the system call technique from ASM
+\begin{multicols}{2}
+First print out $msg$, $dataIn$, $endline$
+=MOREASM lab6.s
+.text
+.globl _start
+_start:
+
+mov $M, %edx
+mov $msg, %ecx
+mov $1, %ebx
+mov $4, %eax
+int $0x80
+=TEX
+\columnbreak
+=MOREASM lab6.s
+mov $N, %edx
+mov $dataIn, %ecx
+mov $1, %ebx
+mov $4, %eax
+int $0x80
+
+mov $1, %edx
+mov $endline, %ecx
+mov $1, %ebx
+mov $4, %eax
+int $0x80
+=TEX
+\end{multicols}
+\clearpage
+3 blocks of code above have the same syntax in the format:
+\begin{itemize}
+\item Copy size of buffer to $\%edx$
+\item Copy address of buffer to $\%ecx$
+\item Copy file descriptor to $\%ebx$. In this case, we need $1$ for STOUT
+\item Copy number of system call to $\%eax$. We need $4$ for system write.
+\end{itemize}
+Next, call $load_data$ function to s
+=MOREASM lab6.s
+# store data to disks
+call load_data
+
+mov $DISK_SIZE, %edx
+mov $disk1, %ecx
+mov $1, %ebx
+mov $4, %eax
+int $0x80
+
+mov $1, %edx
+mov $endline, %ecx
+mov $1, %ebx
+mov $4, %eax
+int $0x80
+
+mov $DISK_SIZE, %edx
+mov $disk2, %ecx
+mov $1, %ebx
+mov $4, %eax
+int $0x80
+
+mov $1, %edx
+mov $endline, %ecx
+mov $1, %ebx
+mov $4, %eax
+int $0x80
+
+mov $DISK_SIZE, %edx
+mov $disk3, %ecx
+mov $1, %ebx
+mov $4, %eax
+int $0x80
+
+mov $1, %edx
+mov $endline, %ecx
+mov $1, %ebx
+mov $4, %eax
+int $0x80
+
+mov $DISK_SIZE, %edx
+mov $disk4, %ecx
+mov $1, %ebx
+mov $4, %eax
+int $0x80
+
+mov $1, %edx
+mov $endline, %ecx
+mov $1, %ebx
+mov $4, %eax
+int $0x80
+
+#If disk2 is corrupted
+push $disk2
+call make_corrupt
+add $4, %esp
+# print msg1
+mov $M1, %edx
+mov $msg1, %ecx
+mov $1, %ebx
+mov $4, %eax
+int $0x80
+
+#DataOut at that time
+call print_dataOut
+
+# print msg2
+mov $M2, %edx
+mov $msg2, %ecx
+mov $1, %ebx
+mov $4, %eax
+int $0x80
+#Rebuild corrupted disk
+push $disk1
+push $disk3
+push $disk4
+push $disk2	# this for fixing
+call rebuild
+add $12, %esp
+
+#DataOut at that time
+call print_dataOut
+
+mov $1, %eax
+mov $0, %ebx
+int $0x80
+
+=TEX
+Store data to disk
+=MOREASM lab6.s
+load_data:
+push %ebp
+mov %esp, %ebp
+mov $8, %esi		#i = 8
+mov $7, %edi		#j = 7
+_L1:
+cmp $51, %esi		# N-2
+jge _L2			# if i >= 51
+movb dataIn(%esi), %cl
+movb %cl, disk1(%edi)
+inc %esi
+movb dataIn(%esi), %cl
+movb %cl, disk2(%edi)
+inc %esi
+movb dataIn(%esi), %cl
+movb %cl, disk3(%edi)
+xor disk1(%edi),%cl
+xor disk2(%edi),%cl
+movb %cl, disk4(%edi)
+inc %esi
+inc %edi
+jmp _L1
+
+_L2:
+mov %ebp, %esp
+pop %ebp
+ret
+=TEX
+Make disk corrupt
+=MOREASM lab6.s
+make_corrupt:
+push %ebp
+mov %esp, %ebp
+mov 8(%ebp), %eax
+mov $0, %edi
+_L3:
+cmp $DISK_SIZE, %edi
+jg _L4
+movb $'.', (%eax,%edi,1)
+inc %edi
+jmp _L3
+_L4:
+mov %ebp, %esp
+pop %ebp
+ret
+=TEX
+Construct DataOut and print it 
+=MOREASM lab6.s
+print_dataOut:
+push %ebp
+mov %esp, %ebp
+mov $9, %esi	# i = 9
+mov $7, %edi	# j = 7
+_L5:
+cmp $DISK_SIZE, %edi	
+jge _L6
+movb disk1(%edi), %cl	#disk1[j]
+movb %cl, dataOut(%esi)	#dataOut[i]
+inc %esi
+movb disk2(%edi), %cl	#disk2[j]
+movb %cl, dataOut(%esi)	#dataOut[i+1]
+inc %esi
+movb disk3(%edi), %cl	#disk3[j]
+movb %cl, dataOut(%esi)	#dataOut[i+2]
+inc %esi
+inc %edi
+jmp _L5
+_L6:
+#write dataOut into terminal
+mov $N, %edx
+mov $dataOut, %ecx
+mov $1, %ebx
+mov $4, %eax
+int $0x80
+
+mov $1, %edx
+mov $endline, %ecx
+mov $1, %ebx
+mov $4, %eax
+int $0x80
+
+mov %ebp, %esp
+pop %ebp
+ret
+=TEX
+Fixing/Rebuilding the corrupted disk by doing xor others.
+=MOREASM lab6.s
+rebuild:
+push %ebp
+mov %esp, %ebp
+mov $7, %edi	# j = 7
+mov $DISK_SIZE, %edx
+_L7:
+cmp $DISK_SIZE, %edi
+jge _L8
+mov 20(%ebp), %eax
+movb (%eax,%edi,1), %cl
+mov 16(%ebp), %eax
+xor (%eax,%edi,1),%cl
+mov 12(%ebp), %eax
+xor (%eax,%edi,1),%cl
+mov 8(%ebp), %eax	#this need rebuilding
+movb %cl, (%eax,%edi,1)
+inc %edi
+jmp _L7
+_L8:
+mov %ebp, %esp
+pop %ebp
+ret
+=TEX
+\end{document}
